@@ -1,56 +1,81 @@
-import { Component } from '@angular/core';
-import { HttpClient, HttpHeaders } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { NgModule } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { HttpClientModule } from '@angular/common/http';
 import { CommonModule } from '@angular/common';
-import { Router, RouterOutlet, RouterModule} from '@angular/router';
+import { HttpClient, HttpClientModule } from '@angular/common/http';
+import { Component } from '@angular/core';
+import {
+  FormBuilder,
+  FormGroup,
+  ReactiveFormsModule,
+  Validators,
+} from '@angular/forms';
+import { Router, RouterModule } from '@angular/router';
+import { Store } from '@ngrx/store';
+import { User } from '../models/user.model';
+import { addUser } from '../states/user/user.action';
+import { UserState } from '../states/user/user.reducer';
+
 @Component({
   selector: 'app-user-add',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterModule, HttpClientModule],
+  imports: [CommonModule, ReactiveFormsModule, HttpClientModule],
   templateUrl: './user-add.component.html',
-  styleUrl: './user-add.component.scss'
+  styleUrl: './user-add.component.scss',
 })
 export class UserAddComponent {
-  userName: string = '';
-  userProfession: string = '';
   showAlert: boolean = false;
+  userId!: number;
+  createdUserAt: string = '';
+  userForm!: FormGroup;
+  loading!: boolean;
 
-  constructor(private http: HttpClient, private router: Router) {}
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private store: Store<UserState>,
+    private formBuilder: FormBuilder
+  ) {}
+
+  ngOnInit(): void {
+    this.userForm = this.formBuilder.group({
+      name: ['', Validators.required],
+      job: ['', Validators.required],
+    });
+  }
 
   onSubmit() {
-    const userData = {
-      name: this.userName,
-      job: this.userProfession
-    };
-    
-    this.createUser(userData);
+    this.onCloseAlert();
+
+    if (this.userForm.valid) {
+      this.createUser(this.userForm.value);
+    } else {
+      this.userForm.markAllAsTouched();
+    }
   }
-  
-  createUser(userData: any) {
+
+  createUser(userData: User) {
     const url = 'https://reqres.in/api/users';
     this.showAlert = false;
-    this.http.post(url, userData).subscribe(
-      response => {
+    this.loading = true;
+    this.http.post(url, userData).subscribe({
+      next: (response: any): void => {
         console.log('User added successfully:', response);
+        this.store.dispatch(addUser({ user: response }));
+        this.loading = false;
         this.clearInputs();
         this.showAlert = true;
+        setTimeout(() => this.onCloseAlert(), 3000);
       },
-      error => {
+      error: (error) => {
         console.error('Error adding user:', error);
-      }
-    );
+        this.loading = false;
+      },
+    });
   }
 
   clearInputs() {
-    this.userName = '';
-    this.userProfession = '';
+    this.userForm.reset();
   }
 
   onCloseAlert() {
-    // Reset the showAlert flag to hide the alert when it's closed
     this.showAlert = false;
   }
 
